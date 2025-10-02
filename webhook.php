@@ -12,41 +12,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 require_once "src/functions.php";
 require_once "src/constants.php";
 require_once "src/AmoCrm.php";
-require_once "src/Vk.php";
 // Получение данных хука
 $data = json_decode(file_get_contents('php://input'), true);
 try {
+    if (empty($data['object']['message']['from_id'])) throw new Exception('Не переданы данные', 400);
     // Создаем экземпляры классов
     $amoV4Client = new AmoCrmV4Client(SUB_DOMAIN, CLIENT_ID, CLIENT_SECRET, CODE, REDIRECT_URL);
-    $vk = new vk(VK_TOKEN);
     // id vk пользователя
     $vk_id = $data['object']['message']['from_id'];
-    // Получаем имя для поиска
-    $name = $vk->getName($vk_id);
-    $contact = $amoV4Client->POSTRequestApi(
-        'contacts',
-        ['query' => $name, 'whith' => 'leads']
-    )['_embedded']['contacts'];
-
-    if (!empty($contact)) {
-        // Добавляем id в поле
-        $lead = $contact[0]['_embedded']['leads'][0]['id'];
-        $params =
-            [
-                'pipeline_id' => PIPELINE_ID,
-                'status_id' => STATUS_ID
-            ];
-        $params[0]['custom_fields_values'] = [
-            "field_id" => FILD_VK_ID,
-            "values" => [
-                [
-                    "value" => $data['comment'],
-                ]
-            ]
+    $params =
+        [
+            'pipeline_id' => PIPELINE_ID,
+            'status_id' => STATUS_ID
         ];
-        $amoV4Client->POSTRequestApi('leads/' . $lead, $params);
-    } else
-        throw new Exception('Контакт не найден', 404);
+    $params[0]['custom_fields_values'] = [
+        "field_id" => FILD_VK_ID,
+        "values" => [
+            [
+                "value" => $data['comment'],
+            ]
+        ]
+    ];
+    $amoV4Client->POSTRequestApi('leads/' . $lead, $params);
 } catch (Exception $ex) {
     http_response_code($ex->getCode());
     echo json_encode([
